@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import nodemailer from "nodemailer";
 import { server } from "@/lib/supabase/server";
 import { ucitajProstore } from "@/lib/prostor";
-import { obradiMail, testirajKljuc, type Mail } from "@/lib/ai";
+import { obradiMail, napisiNacrtZa, testirajKljuc, type Mail } from "@/lib/ai";
 import { kreirajPrijedlog, type SadrzajPrijedloga } from "@/lib/prijedlog";
 
 export type IshodAI = { greska?: string; poruka?: string };
@@ -134,6 +134,54 @@ export async function urediNacrt(id: string, nacrt: string): Promise<IshodAI> {
   if (error) return { greska: error.message };
   revalidatePath("/prijedlozi");
   return { poruka: "Nacrt je sačuvan." };
+}
+
+/** Vraca filtrirani mail u prijedloge i generise nacrt (AI je pogresio). */
+async function vratiFiltriraniInterno(id: string): Promise<IshodAI> {
+  const { supabase, user } = await prijavljen();
+
+  const { data: p } = await supabase
+    .from("suggestions")
+    .select("id, sadrzaj, workspace_id")
+    .eq("id", id)
+    .single();
+  if (!p) return { greska: "Prijedlog ne postoji." };
+
+  const { data: kljuc } = await supabase.rpc("ai_kljuc");
+  if (!kljuc) return { greska: "Dodaj Claude ključ u Nalozi i AI podešavanja." };
+
+  const { data: post } = await supabase
+    .from("korisnik_postavke")
+    .select("model_pisanje")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const s = p.sadrzaj as SadrzajPrijedloga;
+  const { prostori } = await ucitajProstore();
+  const prostor = prostori.find((x) => x.id === p.workspace_id) ?? null;
+
+  try {
+    const nacrt = await napisiNacrtZa({
+      kljuc: kljuc as string,
+      modelPisanje: post?.model_pisanje ?? "claude-sonnet-5-5",
+      mail: s.original,
+      prostor,
+    });
+    const { error } = await supabase
+      .from("suggestions")
+      .update({ status: "ceka", sadrzaj: { ...s, nacrt } })
+      .eq("id", id);
+    if (error) return { greska: error.message };
+    revalidatePath("/prijedlozi");
+    return { poruka: "Vraćeno u prijedloge." };
+  } catch (e) {
+    return { greska: `Nacrt nije uspio: ${e instanceof Error ? e.message : "greška"}` };
+  }
+}
+
+/** Oblik za form action: vraca void, ishod se vidi u panelu nakon osvjezenja. */
+export async function vratiFiltrirano(id: string): Promise<void> {
+  await vratiFiltriraniInterno(id);
 }
 
 function emailIz(tekst: string): string | null {

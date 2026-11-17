@@ -27,15 +27,35 @@ export async function kreirajPrijedlog(
   prostori: ProstorZaAI[],
   prostorNaloga: string | null,
 ): Promise<{ filtrirano: boolean; poruka: string }> {
-  if (ishod.filtrirano) {
-    return { filtrirano: true, poruka: `Filtrirano kao reklama ili newsletter: ${ishod.razlog}` };
-  }
-
   const prostor =
-    ishod.prostor ??
+    (!ishod.filtrirano ? ishod.prostor : null) ??
     prostori.find((p) => p.id === prostorNaloga) ??
     prostori[0];
   if (!prostor) return { filtrirano: false, poruka: "Nema prostora za ovaj mail." };
+
+  if (ishod.filtrirano) {
+    const sadrzajFiltriran: SadrzajPrijedloga = {
+      naslov: mail.tema || "Mail bez teme",
+      sazetak: ishod.razlog,
+      zadatak: null,
+      prioritet: 5,
+      rok: null,
+      nacrt: null,
+      original: mail,
+      nalog_id: nalogId,
+      prostor_slug: prostor.slug,
+    };
+    const { error } = await supabase.from("suggestions").insert({
+      user_id: korisnikId,
+      workspace_id: prostor.id,
+      tip: "odgovor",
+      sadrzaj: sadrzajFiltriran,
+      obrazlozenje: ishod.razlog,
+      status: "filtrirano",
+    });
+    if (error) return { filtrirano: true, poruka: error.message };
+    return { filtrirano: true, poruka: `Filtrirano (AI): ${ishod.razlog}` };
+  }
 
   const sadrzaj: SadrzajPrijedloga = {
     naslov: ishod.analiza.zadatak ?? mail.tema ?? "Mail bez teme",

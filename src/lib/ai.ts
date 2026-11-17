@@ -174,6 +174,16 @@ export async function obradiMail(args: {
   return { filtrirano: false, analiza, nacrt, prostor };
 }
 
+/** Nacrt za mail koji je vec ocijenjen (npr. vracen iz filtriranih), bez ponovnog filtriranja. */
+export async function napisiNacrtZa(args: {
+  kljuc: string;
+  modelPisanje: string;
+  mail: Mail;
+  prostor: ProstorZaAI | null;
+}): Promise<string> {
+  return napisiNacrt(klijent(args.kljuc), args.modelPisanje, args.mail, args.prostor);
+}
+
 /** Provjera kljuca: najjeftiniji poziv, par tokena. */
 export async function testirajKljuc(kljuc: string, model: string): Promise<string> {
   const odgovor = await klijent(kljuc).messages.create({
