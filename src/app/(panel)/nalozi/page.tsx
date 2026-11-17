@@ -3,6 +3,8 @@ import { ucitajProstore } from "@/lib/prostor";
 import ListaNaloga from "@/components/ListaNaloga";
 import FormaAI from "@/components/FormaAI";
 import { novoProstor, urediProstor } from "@/app/akcije-prostori";
+import { headers } from "next/headers";
+import PowerAutomateUputstvo from "@/components/PowerAutomateUputstvo";
 
 const POLJE = "polje w-full";
 
@@ -24,7 +26,13 @@ export default async function Nalozi() {
     .eq("user_id", user!.id)
     .maybeSingle();
 
-  const webBaza = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+  const zaglavlja = await headers();
+  const webBaza =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    `${zaglavlja.get("x-forwarded-proto") ?? "https"}://${zaglavlja.get("host") ?? ""}`;
+  const webhookNalozi = (nalozi ?? [])
+    .filter((n) => n.vrsta === "webhook" && n.webhook_token)
+    .map((n) => ({ naziv: n.naziv, webhook_token: n.webhook_token as string }));
 
   return (
     <div className="space-y-10">
@@ -99,6 +107,8 @@ export default async function Nalozi() {
           </p>
         </div>
         <ListaNaloga nalozi={nalozi ?? []} prostori={prostori} webBaza={webBaza} />
+        <PowerAutomateUputstvo baza={webBaza} webhookNalozi={webhookNalozi} />
+
         <p className="tiho text-xs">
           Gmail: obična lozinka ne radi, treba app password (Google nalog → Security → App passwords). Fascikla poslanih: <code>[Gmail]/Sent Mail</code>.
         </p>

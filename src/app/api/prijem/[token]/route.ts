@@ -4,6 +4,11 @@ import { kreirajPrijedlog } from "@/lib/prijedlog";
 
 export const runtime = "nodejs";
 
+/** Provjera adrese (Make, Power Automate i browser). Ne radi nista, samo potvrdjuje da ruta postoji. */
+export async function GET() {
+  return Response.json({ status: "spremno", poruka: "Adresa prima POST sa JSON tijelom: od, tema, tijelo." });
+}
+
 /**
  * Webhook / forwarding prijem. POST JSON: { od, tema, tijelo }.
  * Token iz naloga je jedina autorizacija. Koristi servisni kljuc, pa mora biti u env-u.
