@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+:root {
+  --pozadina: #f7f7f5;
+  --ploca: #ffffff;
+  --ivica: #e4e4e1;
+  --tekst: #1c1c1a;
+  --tekst-tih: #6b6b66;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pozadina: #171716;
+    --ploca: #1f1f1e;
+    --ivica: #343431;
+    --tekst: #f2f2ef;
+    --tekst-tih: #9a9a93;
+  }
+}
+
+body {
+  background: var(--pozadina);
+  color: var(--tekst);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.ploca {
+  background: var(--ploca);
+  border: 1px solid var(--ivica);
+  border-radius: 10px;
+}
+
+.tiho {
+  color: var(--tekst-tih);
+}

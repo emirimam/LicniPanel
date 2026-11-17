@@ -1,0 +1,16 @@
+node_modules
+.next
+out
+build
+.DS_Store
+
+# Tajne nikada ne idu u repozitorij - ovaj repo je javan.
+.env
+.env.local
+.env*.local
+
+*.pem
+npm-debug.log*
+.vercel
+next-env.d.ts
+tsconfig.tsbuildinfo
