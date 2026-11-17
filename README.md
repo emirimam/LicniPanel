@@ -14,7 +14,7 @@ Mail worker i AI sloj dolaze u sljedećem koraku.
 | Dio | Stanje |
 | --- | --- |
 | Šema baze + RLS | gotovo |
-| Prijava (magic link) | gotovo |
+|  Prijava (e-mail i lozinka) | gotovo |
 | Kanban po projektima | gotovo |
 | Brzi unos jednom linijom | gotovo |
 | Inbox prijedloga | ekran gotov, čeka izvor |
@@ -31,7 +31,7 @@ cp .env.example .env.local   # popuni vrijednosti
 npm run dev
 ```
 
-Otvori `http://localhost:3000`, upiši svoju adresu i prijavi se linkom iz pošte.
+Otvori `http://localhost:3000`, napravi nalog adresom i lozinkom, pa se prijavi.
 Prostori **Posao** i **Privatno** prave se sami pri prvoj prijavi.
 
 ## Baza
