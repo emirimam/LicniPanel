@@ -3,31 +3,52 @@
 import { useTransition } from "react";
 import { postaviProstor } from "@/app/akcije";
 import type { Prostor } from "@/lib/tipovi";
+import { SVE } from "@/lib/prostor-konst";
 
+/** Birac prostora: Sve zajedno ili jedna firma/privatno. */
 export default function PrebacivacProstora({
   prostori,
   aktivni,
+  sve,
 }: {
   prostori: Prostor[];
   aktivni: Prostor | null;
+  sve: boolean;
 }) {
   const [ceka, pokreni] = useTransition();
 
+  const opcije: { slug: string; naziv: string; boja: string | null }[] = [
+    { slug: SVE, naziv: "Sve zajedno", boja: null },
+    ...prostori.map((p) => ({ slug: p.slug, naziv: p.naziv, boja: p.boja })),
+  ];
+
   return (
-    <div className="flex gap-1" aria-label="Prostor">
-      {prostori.map((p) => {
-        const izabran = p.slug === aktivni?.slug;
+    <div
+      className="flex flex-wrap gap-1 rounded-lg border p-1"
+      style={{ borderColor: "var(--ivica)" }}
+      role="group"
+      aria-label="Prostor"
+    >
+      {opcije.map((o) => {
+        const izabran = o.slug === SVE ? sve : !sve && o.slug === aktivni?.slug;
         return (
           <button
-            key={p.id}
+            key={o.slug}
+            type="button"
             disabled={ceka}
-            onClick={() => pokreni(() => postaviProstor(p.slug))}
-            className={`px-3 py-1 rounded-md text-sm transition ${
-              izabran ? "text-white" : "tiho hover:opacity-70"
+            onClick={() => pokreni(() => postaviProstor(o.slug))}
+            className={`flex items-center gap-2 rounded-md px-3 py-1 text-sm transition ${
+              izabran ? "bg-white/[0.08] text-white" : "tiho hover:text-[var(--tekst)]"
             }`}
-            style={izabran ? { background: p.boja ?? "#2563eb" } : undefined}
           >
-            {p.naziv}
+            {o.boja && (
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ background: o.boja }}
+                aria-hidden="true"
+              />
+            )}
+            {o.naziv}
           </button>
         );
       })}

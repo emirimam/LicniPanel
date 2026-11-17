@@ -1,49 +1,41 @@
-import Link from "next/link";
 import { ucitajProstore } from "@/lib/prostor";
 import { odjava } from "@/app/akcije";
 import PrebacivacProstora from "@/components/PrebacivacProstora";
-
-const VEZE = [
-  { href: "/tabla", naziv: "Tabla" },
-  { href: "/prijedlozi", naziv: "Prijedlozi" },
-  { href: "/cekam", naziv: "Čekam odgovor" },
-  { href: "/nalozi", naziv: "Nalozi" },
-] as const;
+import Sidebar from "@/components/Sidebar";
 
 export default async function PanelLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { prostori, aktivni } = await ucitajProstore();
+  const { prostori, aktivni, sve } = await ucitajProstore();
 
   return (
-    <div className="min-h-screen">
-      <header
-        className="border-b"
-        style={{ borderColor: "var(--ivica)", background: "var(--ploca)" }}
-      >
-        <div className="mx-auto max-w-6xl px-4 h-14 flex items-center gap-6">
-          <span className="font-semibold text-sm">Lični panel</span>
+    <div className="min-h-screen md:flex">
+      <Sidebar
+        footer={
+          <form action={odjava}>
+            <button className="tiho w-full rounded-md px-3 py-2 text-left text-sm hover:bg-white/[0.04] hover:text-[var(--tekst)]">
+              Odjava
+            </button>
+          </form>
+        }
+      />
 
-          <nav className="flex gap-4 text-sm">
-            {VEZE.map((v) => (
-              <Link key={v.href} href={v.href} className="tiho hover:opacity-70">
-                {v.naziv}
-              </Link>
-            ))}
-          </nav>
-
-          <div className="ml-auto flex items-center gap-4">
-            <PrebacivacProstora prostori={prostori} aktivni={aktivni} />
-            <form action={odjava}>
-              <button className="tiho text-sm hover:opacity-70">Odjava</button>
-            </form>
+      <div className="min-w-0 flex-1">
+        <header
+          className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b pl-16 pr-4 backdrop-blur md:pl-8 md:pr-8"
+          style={{ borderColor: "var(--ivica)", background: "rgba(9,9,11,0.8)" }}
+        >
+          <div className="ml-auto">
+            <PrebacivacProstora prostori={prostori} aktivni={aktivni} sve={sve} />
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+        <main className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

@@ -12,6 +12,8 @@ export type Prostor = {
   naziv: string;
   slug: string;
   boja: string | null;
+  potpis: string | null;
+  ton: string | null;
 };
 
 export type Zadatak = {
@@ -21,12 +23,14 @@ export type Zadatak = {
   faza: Faza;
   prioritet: number;
   rok: string | null;
+  vrijeme: string | null;
   redoslijed: number;
   project_id: string | null;
   contact_id: string | null;
   source_message_id: string | null;
   projects?: { naziv: string } | null;
   contacts?: { ime: string } | null;
+  workspaces?: { naziv: string; boja: string | null } | null;
 };
 
 export type Prijedlog = {

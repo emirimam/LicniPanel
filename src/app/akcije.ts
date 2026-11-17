@@ -25,7 +25,7 @@ export async function pomjeriZadatak(id: string, faza: Faza) {
       zavrseno_u: faza === "zavrseno" ? new Date().toISOString() : null,
     })
     .eq("id", id);
-  revalidatePath("/tabla");
+  revalidatePath("/", "layout");
 }
 
 export async function dodajZadatak(formData: FormData) {
@@ -38,12 +38,15 @@ export async function dodajZadatak(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/prijava");
 
-  const slug = (await cookies()).get(KOLACIC_PROSTORA)?.value;
+  // U prikazu "Sve zajedno" prostor se bira u formi; inace je izabrani iz kolacica.
+  const izbor =
+    String(formData.get("prostor") ?? "") ||
+    (await cookies()).get(KOLACIC_PROSTORA)?.value;
   const { data: prostori } = await supabase
     .from("workspaces")
     .select("id, slug")
     .order("naziv");
-  const prostor = prostori?.find((p) => p.slug === slug) ?? prostori?.[0];
+  const prostor = prostori?.find((p) => p.slug === izbor) ?? prostori?.[0];
   if (!prostor) return;
 
   const r = razloziUnos(unos);
@@ -65,14 +68,14 @@ export async function dodajZadatak(formData: FormData) {
     user_id: user.id,
     workspace_id: prostor.id,
     naslov: r.naslov || unos,
-    opis: r.vrijeme ? `Vrijeme: ${r.vrijeme}` : null,
+    vrijeme: r.vrijeme,
     rok: r.rok,
     prioritet: r.prioritet,
     project_id: projectId,
     faza: "novo",
   });
 
-  revalidatePath("/tabla");
+  revalidatePath("/", "layout");
 }
 
 export async function rijesiPrijedlog(id: string, prihvacen: boolean) {
@@ -110,8 +113,7 @@ export async function rijesiPrijedlog(id: string, prihvacen: boolean) {
     })
     .eq("id", id);
 
-  revalidatePath("/prijedlozi");
-  revalidatePath("/tabla");
+  revalidatePath("/", "layout");
 }
 
 export async function odjava() {

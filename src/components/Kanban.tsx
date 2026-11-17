@@ -1,87 +1,123 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { pomjeriZadatak } from "@/app/akcije";
 import { FAZE, type Faza, type Zadatak } from "@/lib/tipovi";
+import {
+  PrioritetZnacka,
+  ProjekatZnacka,
+  ProstorZnacka,
+  RokZnacka,
+  VrijemeZnacka,
+} from "@/components/Znacke";
 
-function dospijeva(rok: string | null): { tekst: string; hitno: boolean } | null {
-  if (!rok) return null;
-  const danas = new Date();
-  danas.setHours(0, 0, 0, 0);
-  const d = new Date(`${rok}T00:00:00`);
-  const dana = Math.round((d.getTime() - danas.getTime()) / 86400000);
-
-  if (dana < 0) return { tekst: `kasni ${Math.abs(dana)} d`, hitno: true };
-  if (dana === 0) return { tekst: "danas", hitno: true };
-  if (dana === 1) return { tekst: "sutra", hitno: false };
-  return { tekst: `za ${dana} d`, hitno: false };
-}
-
-export default function Kanban({ zadaci }: { zadaci: Zadatak[] }) {
+/** Tabla sa 4 kolone. Karticu mozes prevuci u drugu kolonu ili koristiti strelice. */
+export default function Kanban({
+  zadaci,
+  prikaziProstor,
+}: {
+  zadaci: Zadatak[];
+  prikaziProstor: boolean;
+}) {
   const [ceka, pokreni] = useTransition();
+  const [povuceno, setPovuceno] = useState<string | null>(null);
+  const [cilj, setCilj] = useState<Faza | null>(null);
+
+  const premjesti = (id: string, faza: Faza) =>
+    pokreni(() => pomjeriZadatak(id, faza));
 
   return (
     <div className="grid gap-3 md:grid-cols-4">
       {FAZE.map((faza) => {
         const uKoloni = zadaci.filter((z) => z.faza === faza.kljuc);
+        const naCilju = cilj === faza.kljuc && povuceno !== null;
+
         return (
-          <section key={faza.kljuc} className="ploca p-3">
-            <header className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold">{faza.naziv}</h2>
-              <span className="tiho text-xs">{uKoloni.length}</span>
+          <section
+            key={faza.kljuc}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setCilj(faza.kljuc);
+            }}
+            onDragLeave={() => setCilj((c) => (c === faza.kljuc ? null : c))}
+            onDrop={(e) => {
+              e.preventDefault();
+              const id = e.dataTransfer.getData("text/plain");
+              setCilj(null);
+              setPovuceno(null);
+              if (id) premjesti(id, faza.kljuc);
+            }}
+            className={`rounded-xl border p-2 transition ${
+              naCilju ? "bg-white/[0.04]" : "bg-transparent"
+            }`}
+            style={{ borderColor: naCilju ? "var(--ivica-jaca)" : "var(--ivica)" }}
+          >
+            <header className="mb-2 flex items-center justify-between px-1 py-1">
+              <h2 className="text-xs font-semibold uppercase tracking-wide tiho">
+                {faza.naziv}
+              </h2>
+              <span className="tiho text-xs tabular-nums">{uKoloni.length}</span>
             </header>
 
             <div className="space-y-2">
               {uKoloni.map((z) => {
-                const rok = dospijeva(z.rok);
                 const indeks = FAZE.findIndex((f) => f.kljuc === z.faza);
-
                 return (
                   <article
                     key={z.id}
-                    className="rounded-md border p-3 text-sm"
-                    style={{ borderColor: "var(--ivica)" }}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("text/plain", z.id);
+                      e.dataTransfer.effectAllowed = "move";
+                      setPovuceno(z.id);
+                    }}
+                    onDragEnd={() => {
+                      setPovuceno(null);
+                      setCilj(null);
+                    }}
+                    className={`ploca-hover cursor-grab rounded-lg p-3 text-sm active:cursor-grabbing ${
+                      povuceno === z.id ? "opacity-40" : ""
+                    }`}
                   >
-                    <div className="flex items-start gap-2">
-                      {z.prioritet <= 2 && (
-                        <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-red-500" />
-                      )}
-                      <p className="flex-1">{z.naslov}</p>
-                    </div>
+                    <p className="leading-snug">{z.naslov}</p>
 
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs tiho">
-                      {z.projects?.naziv && <span>{z.projects.naziv}</span>}
-                      {rok && (
-                        <span className={rok.hitno ? "text-red-600" : undefined}>
-                          {rok.tekst}
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <PrioritetZnacka prioritet={z.prioritet} />
+                      {z.projects?.naziv && <ProjekatZnacka naziv={z.projects.naziv} />}
+                      <RokZnacka rok={z.rok} />
+                      <VrijemeZnacka vrijeme={z.vrijeme} />
+                      {z.source_message_id && (
+                        <span className="tiho text-[11px]" title="nastalo iz pošte">
+                          ✉
                         </span>
                       )}
-                      {z.source_message_id && <span title="nastalo iz pošte">✉</span>}
                     </div>
 
-                    <div className="mt-2 flex gap-2">
+                    {prikaziProstor && z.workspaces && (
+                      <div className="mt-2">
+                        <ProstorZnacka naziv={z.workspaces.naziv} boja={z.workspaces.boja} />
+                      </div>
+                    )}
+
+                    <div className="mt-2 flex items-center gap-1">
                       {indeks > 0 && (
                         <button
+                          type="button"
                           disabled={ceka}
-                          onClick={() =>
-                            pokreni(() =>
-                              pomjeriZadatak(z.id, FAZE[indeks - 1].kljuc as Faza),
-                            )
-                          }
-                          className="tiho text-xs hover:opacity-70"
+                          onClick={() => premjesti(z.id, FAZE[indeks - 1].kljuc)}
+                          className="tiho rounded px-1.5 py-0.5 text-xs hover:bg-white/[0.06] hover:text-[var(--tekst)]"
+                          aria-label="Vrati u prethodnu kolonu"
                         >
                           ←
                         </button>
                       )}
                       {indeks < FAZE.length - 1 && (
                         <button
+                          type="button"
                           disabled={ceka}
-                          onClick={() =>
-                            pokreni(() =>
-                              pomjeriZadatak(z.id, FAZE[indeks + 1].kljuc as Faza),
-                            )
-                          }
-                          className="tiho text-xs hover:opacity-70"
+                          onClick={() => premjesti(z.id, FAZE[indeks + 1].kljuc)}
+                          className="tiho rounded px-1.5 py-0.5 text-xs hover:bg-white/[0.06] hover:text-[var(--tekst)]"
+                          aria-label="Pomjeri u sljedecu kolonu"
                         >
                           →
                         </button>
@@ -92,7 +128,7 @@ export default function Kanban({ zadaci }: { zadaci: Zadatak[] }) {
               })}
 
               {uKoloni.length === 0 && (
-                <p className="tiho text-xs py-6 text-center">prazno</p>
+                <p className="tiho py-8 text-center text-xs">prazno</p>
               )}
             </div>
           </section>

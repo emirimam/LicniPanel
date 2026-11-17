@@ -10,15 +10,19 @@
     "tipovi": "supabase gen types typescript --project-id sgrxammnrdvrcoboxobz > src/lib/baza.types.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.10.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.119.0",
+    "imapflow": "^2.12.1",
     "next": "^16.4.6",
+    "nodemailer": "^10.6.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^22.10.5",
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^19.0.7",
     "@types/react-dom": "^19.0.3",
     "tailwindcss": "^4.0.0",
