@@ -5,10 +5,15 @@ import { adrese, izvod, zapis } from "./util.js";
 const PRVI_PUT = Number(process.env.PRVI_PUT_ZADNJIH || 30);
 
 export function naprviKlijenta(nalog) {
+  const nacin = nalog.tls_nacin ?? (nalog.port === 993 ? "ssl" : "starttls");
+  const tls =
+    nacin === "ssl"
+      ? { secure: true, doSTARTTLS: false }
+      : { secure: false, doSTARTTLS: nacin === "starttls" };
   return new ImapFlow({
     host: nalog.host,
     port: nalog.port,
-    secure: nalog.port === 993,
+    ...tls,
     auth: { user: nalog.korisnik, pass: nalog.lozinka },
     logger: false,
     emitLogs: false,

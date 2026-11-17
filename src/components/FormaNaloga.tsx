@@ -17,6 +17,7 @@ export type Nalog = {
   smtp_host: string | null;
   smtp_port: number | null;
   webhook_token: string | null;
+  tls_nacin?: "ssl" | "starttls" | "nista";
 };
 
 const PREDLOSCI: Record<string, { host: string; port: number; smtp: string; poslane: string }> = {
@@ -127,6 +128,15 @@ export default function FormaNaloga({
               </button>
             </div>
           )}
+
+          <label className="space-y-1 md:col-span-2">
+            <span className="tiho text-xs">Šifrovanje (IMAP)</span>
+            <select name="tls_nacin" defaultValue={nalog?.tls_nacin ?? "ssl"} className={POLJE}>
+              <option value="ssl">SSL/TLS (obično port 993)</option>
+              <option value="starttls">STARTTLS (obično port 143)</option>
+              <option value="nista">Bez šifrovanja (ne preporučuje se)</option>
+            </select>
+          </label>
 
           <div className="grid gap-3 md:grid-cols-[2fr_1fr]">
             <label className="space-y-1">

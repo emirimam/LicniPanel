@@ -36,7 +36,7 @@ export async function ucitajNaloge(userId) {
   const { data, error } = await baza
     .from("accounts")
     .select(
-      "id, naziv, host, port, korisnik, workspace_id, fascikla_poslane, secret_ref, stanje",
+      "id, naziv, host, port, tls_nacin, korisnik, workspace_id, fascikla_poslane, secret_ref, stanje",
     )
     .eq("user_id", userId)
     .eq("aktivan", true)

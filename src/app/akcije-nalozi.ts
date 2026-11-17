@@ -12,6 +12,16 @@ export type IshodTesta = { ok: boolean; poruka: string };
 const VRSTE = ["imap", "gmail", "webhook"] as const;
 type Vrsta = (typeof VRSTE)[number];
 
+const TLS = ["ssl", "starttls", "nista"] as const;
+type Tls = (typeof TLS)[number];
+
+/** Pretvara izbor u opcije za imapflow. ssl = 993 direktno, starttls = upgrade na postojecem portu. */
+function tlsOpcije(nacin: Tls) {
+  if (nacin === "ssl") return { secure: true, doSTARTTLS: false };
+  if (nacin === "starttls") return { secure: false, doSTARTTLS: true };
+  return { secure: false, doSTARTTLS: false };
+}
+
 function citaj(formData: FormData) {
   const vrsta = String(formData.get("vrsta") ?? "imap");
   const port = Number(formData.get("port") ?? 993);
@@ -27,6 +37,9 @@ function citaj(formData: FormData) {
     fascikla_poslane: String(formData.get("fascikla_poslane") ?? "").trim() || null,
     smtp_host: String(formData.get("smtp_host") ?? "").trim() || null,
     smtp_port: Number.isFinite(smtpPort) ? smtpPort : 587,
+    tls_nacin: (TLS.includes(String(formData.get("tls_nacin")) as Tls)
+      ? String(formData.get("tls_nacin"))
+      : "ssl") as Tls,
     aktivan: formData.get("aktivan") === "on",
   };
 }
@@ -122,7 +135,7 @@ export async function testirajNalog(formData: FormData): Promise<IshodTesta> {
   const klijent = new ImapFlow({
     host: polja.host,
     port: polja.port,
-    secure: polja.port === 993,
+    ...tlsOpcije(polja.tls_nacin),
     auth: { user: polja.korisnik, pass: lozinka },
     logger: false,
   });

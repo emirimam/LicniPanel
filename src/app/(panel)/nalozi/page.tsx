@@ -13,7 +13,7 @@ export default async function Nalozi() {
   const { data: nalozi } = await supabase
     .from("accounts")
     .select(
-      "id, naziv, vrsta, host, port, korisnik, workspace_id, fascikla_poslane, aktivan, smtp_host, smtp_port, webhook_token, zadnja_sinhronizacija, zadnja_greska, test_status, test_poruka",
+      "id, naziv, vrsta, host, port, korisnik, workspace_id, fascikla_poslane, aktivan, smtp_host, smtp_port, webhook_token, tls_nacin, zadnja_sinhronizacija, zadnja_greska, test_status, test_poruka",
     )
     .order("naziv");
 
