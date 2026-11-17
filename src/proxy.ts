@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const JAVNE = ["/prijava", "/auth"];
+const JAVNE = ["/prijava", "/auth", "/api/prijem"];
 
 export async function proxy(zahtjev: NextRequest) {
   let odgovor = NextResponse.next({ request: zahtjev });
