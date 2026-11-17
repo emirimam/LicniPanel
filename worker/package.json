@@ -1,0 +1,21 @@
+{
+  "name": "licni-panel-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Dovlaci postu preko IMAP-a, klasifikuje je i puni bazu licnog panela.",
+  "scripts": {
+    "start": "node src/index.js",
+    "jednom": "node src/index.js --jednom"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.74.0",
+    "@supabase/supabase-js": "^2.119.0",
+    "dotenv": "^17.2.3",
+    "imapflow": "^1.0.199",
+    "mailparser": "^3.7.2"
+  }
+}
