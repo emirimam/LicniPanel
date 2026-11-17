@@ -7,6 +7,7 @@ const VEZE = [
   { href: "/tabla", naziv: "Tabla" },
   { href: "/prijedlozi", naziv: "Prijedlozi" },
   { href: "/cekam", naziv: "Čekam odgovor" },
+  { href: "/nalozi", naziv: "Nalozi" },
 ] as const;
 
 export default async function PanelLayout({

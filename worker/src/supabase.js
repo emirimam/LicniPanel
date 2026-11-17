@@ -13,8 +13,10 @@ export const baza = createClient(url, kljuc, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-/** Korisnik i njegovi prostori, po adresi iz .env fajla. */
+/** Korisnik po adresi iz .env fajla. */
 export async function nadjiVlasnika(email) {
+  if (!email) throw new Error("Nedostaje VLASNIK_EMAIL u .env fajlu.");
+
   const { data, error } = await baza.auth.admin.listUsers({ perPage: 200 });
   if (error) throw error;
 
@@ -26,52 +28,47 @@ export async function nadjiVlasnika(email) {
       `Nema korisnika s adresom ${email}. Prijavi se jednom u panel pa pokreni ponovo.`,
     );
   }
-
-  const { data: prostori, error: greska } = await baza
-    .from("workspaces")
-    .select("id, naziv, slug")
-    .eq("user_id", korisnik.id);
-  if (greska) throw greska;
-
-  return { korisnik, prostori: prostori ?? [] };
+  return korisnik;
 }
 
-/** Stanje sinhronizacije po nalogu cuvamo u accounts.stanje. */
+/** Aktivni nalozi, onako kako su podeseni u panelu. */
+export async function ucitajNaloge(userId) {
+  const { data, error } = await baza
+    .from("accounts")
+    .select(
+      "id, naziv, host, port, korisnik, workspace_id, fascikla_poslane, secret_ref, stanje",
+    )
+    .eq("user_id", userId)
+    .eq("aktivan", true)
+    .order("naziv");
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** Lozinka iz Vaulta. Ovu funkciju smije zvati samo service_role. */
+export async function lozinkaNaloga(accountId) {
+  const { data, error } = await baza.rpc("lozinka_naloga", {
+    p_account_id: accountId,
+  });
+  if (error) throw error;
+  return data;
+}
+
 export async function upisiStanje(accountId, stanje) {
   await baza
     .from("accounts")
-    .update({ stanje, zadnja_sinhronizacija: new Date().toISOString() })
+    .update({
+      stanje,
+      zadnja_sinhronizacija: new Date().toISOString(),
+      zadnja_greska: null,
+    })
     .eq("id", accountId);
 }
 
-/** Nalog iz .env fajla uparujemo s redom u bazi; pravimo ga ako ga nema. */
-export async function osiguraj(nalog, userId, workspaceId) {
-  const { data: postojeci } = await baza
+export async function upisiGresku(accountId, poruka) {
+  await baza
     .from("accounts")
-    .select("id, stanje")
-    .eq("user_id", userId)
-    .eq("korisnik", nalog.korisnik)
-    .maybeSingle();
-
-  if (postojeci) return postojeci;
-
-  const { data, error } = await baza
-    .from("accounts")
-    .insert({
-      user_id: userId,
-      workspace_id: workspaceId,
-      naziv: nalog.naziv,
-      vrsta: "imap",
-      email: nalog.korisnik,
-      host: nalog.host,
-      port: nalog.port,
-      korisnik: nalog.korisnik,
-      secret_ref: "env",
-      stanje: {},
-    })
-    .select("id, stanje")
-    .single();
-
-  if (error) throw error;
-  return data;
+    .update({ zadnja_greska: poruka?.slice(0, 300) ?? null })
+    .eq("id", accountId);
 }

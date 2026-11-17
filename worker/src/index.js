@@ -1,42 +1,28 @@
 import "dotenv/config";
 import { naprviKlijenta, povuciNove } from "./imap.js";
-import { nadjiVlasnika, osiguraj, upisiStanje } from "./supabase.js";
+import {
+  nadjiVlasnika,
+  ucitajNaloge,
+  lozinkaNaloga,
+  upisiStanje,
+  upisiGresku,
+} from "./supabase.js";
 import { obradiDolaznu, obradiPoslanu } from "./obrada.js";
 import { zapis } from "./util.js";
 
 const JEDNOM = process.argv.includes("--jednom");
 const INTERVAL = Number(process.env.INTERVAL_SEKUNDI || 120) * 1000;
 
-/** Nalozi iz .env fajla: NALOG_1_*, NALOG_2_, ... */
-function ucitajNaloge() {
-  const nalozi = [];
-  for (let i = 1; i <= 20; i++) {
-    const p = `NALOG_${i}_`;
-    const korisnik = process.env[`${p}KORISNIK`];
-    if (!korisnik) continue;
-
-    nalozi.push({
-      naziv: process.env[`${p}NAZIV`] || korisnik,
-      prostor: process.env[`${p}PROSTOR`] || "privatno",
-      host: process.env[`${p}HOST`],
-      port: Number(process.env[`${p}PORT`] || 993),
-      korisnik,
-      lozinka: process.env[`${p}LOZINKA`],
-      poslane: process.env[`${p}POSLANE`] || null,
-    });
-  }
-  return nalozi;
-}
-
 async function sinhronizujFasciklu(klijent, fascikla, ctx, stanjeSvih, poslana) {
   const kljuc = poslana ? "poslane" : "inbox";
   const { poruke, stanje } = await povuciNove(klijent, fascikla, stanjeSvih[kljuc]);
 
-  if (poruke.length === 0) return { stanjeSvih, broj: 0 };
+  if (poruke.length === 0) {
+    return { stanjeSvih: { ...stanjeSvih, [kljuc]: stanje }, broj: 0 };
+  }
 
   zapis(`${ctx.nalog.naziv} / ${fascikla}: ${poruke.length} novih`);
 
-  let obradjeno = 0;
   for (const poruka of poruke) {
     try {
       const rez = poslana
@@ -44,7 +30,6 @@ async function sinhronizujFasciklu(klijent, fascikla, ctx, stanjeSvih, poslana) 
         : await obradiDolaznu(poruka, ctx);
 
       if (rez.preskoceno) continue;
-      obradjeno++;
 
       if (rez.ocjena) {
         zapis(`  ${rez.ocjena.tip.padEnd(16)} ${poruka.tema ?? "(bez teme)"}`);
@@ -56,21 +41,26 @@ async function sinhronizujFasciklu(klijent, fascikla, ctx, stanjeSvih, poslana) 
     }
   }
 
-  return { stanjeSvih: { ...stanjeSvih, [kljuc]: stanje }, broj: obradjeno };
+  return { stanjeSvih: { ...stanjeSvih, [kljuc]: stanje }, broj: poruke.length };
 }
 
-async function sinhronizujNalog(nalog, vlasnik) {
-  const prostor =
-    vlasnik.prostori.find((p) => p.slug === nalog.prostor) ??
-    vlasnik.prostori[0];
+async function sinhronizujNalog(red, userId) {
+  const lozinka = await lozinkaNaloga(red.id);
+  if (!lozinka) {
+    throw new Error("Lozinka nije postavljena. Otvori Nalozi u panelu i upiši je.");
+  }
 
-  if (!prostor) throw new Error("Korisnik nema nijedan prostor.");
-
-  const red = await osiguraj(nalog, vlasnik.korisnik.id, prostor.id);
+  const nalog = {
+    naziv: red.naziv,
+    host: red.host,
+    port: red.port ?? 993,
+    korisnik: red.korisnik,
+    lozinka,
+  };
 
   const ctx = {
-    userId: vlasnik.korisnik.id,
-    workspaceId: prostor.id,
+    userId,
+    workspaceId: red.workspace_id,
     accountId: red.id,
     nalog,
   };
@@ -84,10 +74,10 @@ async function sinhronizujNalog(nalog, vlasnik) {
     const inbox = await sinhronizujFasciklu(klijent, "INBOX", ctx, stanje, false);
     stanje = inbox.stanjeSvih;
 
-    if (nalog.poslane) {
+    if (red.fascikla_poslane) {
       const sent = await sinhronizujFasciklu(
         klijent,
-        nalog.poslane,
+        red.fascikla_poslane,
         ctx,
         stanje,
         true,
@@ -102,32 +92,35 @@ async function sinhronizujNalog(nalog, vlasnik) {
   }
 }
 
-async function krug(nalozi, vlasnik) {
-  for (const nalog of nalozi) {
+async function krug(userId) {
+  let nalozi;
+  try {
+    nalozi = await ucitajNaloge(userId);
+  } catch (e) {
+    zapis("ne mogu ucitati naloge:", e.message);
+    return;
+  }
+
+  if (nalozi.length === 0) {
+    zapis("nema aktivnih naloga. Dodaj ih u panelu, na stranici Nalozi.");
+    return;
+  }
+
+  for (const red of nalozi) {
     try {
-      await sinhronizujNalog(nalog, vlasnik);
+      await sinhronizujNalog(red, userId);
     } catch (e) {
-      zapis(`nalog ${nalog.naziv} pao:`, e.message);
+      zapis(`nalog ${red.naziv} pao:`, e.message);
+      await upisiGresku(red.id, e.message).catch(() => {});
     }
   }
 }
 
 async function glavna() {
-  const nalozi = ucitajNaloge();
-  if (nalozi.length === 0) {
-    zapis("Nema nijednog naloga u .env fajlu. Pogledaj .env.example.");
-    process.exit(1);
-  }
-
   const vlasnik = await nadjiVlasnika(process.env.VLASNIK_EMAIL);
-  zapis(
-    `vlasnik ${vlasnik.korisnik.email}, prostori: ${vlasnik.prostori
-      .map((p) => p.slug)
-      .join(", ")}`,
-  );
-  zapis(`nalozi: ${nalozi.map((n) => n.naziv).join(", ")}`);
+  zapis(`vlasnik: ${vlasnik.email}`);
 
-  await krug(nalozi, vlasnik);
+  await krug(vlasnik.id);
 
   if (JEDNOM) {
     zapis("jedan prolaz gotov.");
@@ -135,7 +128,7 @@ async function glavna() {
   }
 
   zapis(`sljedeca provjera za ${INTERVAL / 1000} s`);
-  setInterval(() => krug(nalozi, vlasnik), INTERVAL);
+  setInterval(() => krug(vlasnik.id), INTERVAL);
 }
 
 glavna().catch((e) => {
