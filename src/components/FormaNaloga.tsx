@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
-import { sacuvajNalog, testirajNalog, type IshodNaloga, type IshodTesta } from "@/app/akcije-nalozi";
+import { sacuvajNalog, testirajNalog, testirajSmtp, type IshodNaloga, type IshodTesta } from "@/app/akcije-nalozi";
 import type { Prostor } from "@/lib/tipovi";
 
 export type Nalog = {
@@ -16,6 +16,10 @@ export type Nalog = {
   aktivan: boolean;
   smtp_host: string | null;
   smtp_port: number | null;
+  smtp_korisnik: string | null;
+  smtp_od: string | null;
+  smtp_tls: "ssl" | "starttls" | "nista" | null;
+  smtp_lozinka_postavljena: boolean;
   webhook_token: string | null;
   tls_nacin?: "ssl" | "starttls" | "nista";
 };
@@ -55,8 +59,12 @@ export default function FormaNaloga({
   const [smtpPort, setSmtpPort] = useState(nalog?.smtp_port ?? 587);
   const [poslane, setPoslane] = useState(nalog?.fascikla_poslane ?? "");
 
+  const [smtpTls, setSmtpTls] = useState(nalog?.smtp_tls ?? "starttls");
+
   const [test, setTest] = useState<IshodTesta | null>(null);
   const [testira, pokreniTest] = useTransition();
+  const [smtpTest, setSmtpTest] = useState<IshodTesta | null>(null);
+  const [smtpTestira, pokreniSmtpTest] = useTransition();
 
   function primijeniPredlozak(kljuc: string) {
     const p = PREDLOSCI[kljuc];
@@ -64,12 +72,19 @@ export default function FormaNaloga({
     setHost(p.host);
     setPort(p.port);
     setSmtpHost(p.smtp);
+    setSmtpPort(587);
+    setSmtpTls("starttls");
     setPoslane(p.poslane);
   }
 
   function testiraj(e: React.MouseEvent<HTMLButtonElement>) {
     const fd = new FormData(e.currentTarget.form!);
     pokreniTest(async () => setTest(await testirajNalog(fd)));
+  }
+
+  function testirajSlanje(e: React.MouseEvent<HTMLButtonElement>) {
+    const fd = new FormData(e.currentTarget.form!);
+    pokreniSmtpTest(async () => setSmtpTest(await testirajSmtp(fd)));
   }
 
   const webhookUrl = nalog?.webhook_token ? `${webBaza}/api/prijem/${nalog.webhook_token}` : null;
@@ -147,14 +162,6 @@ export default function FormaNaloga({
               <span className="tiho text-xs">Port</span>
               <input name="port" type="number" value={port} onChange={(e) => setPort(Number(e.target.value))} className={POLJE} />
             </label>
-            <label className="space-y-1">
-              <span className="tiho text-xs">SMTP server (slanje, opcionalno)</span>
-              <input name="smtp_host" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} className={POLJE} />
-            </label>
-            <label className="space-y-1">
-              <span className="tiho text-xs">SMTP port</span>
-              <input name="smtp_port" type="number" value={smtpPort} onChange={(e) => setSmtpPort(Number(e.target.value))} className={POLJE} />
-            </label>
             <label className="space-y-1 md:col-span-2">
               <span className="tiho text-xs">Fascikla poslanih</span>
               <input name="fascikla_poslane" value={poslane} onChange={(e) => setPoslane(e.target.value)} className={POLJE} />
@@ -175,6 +182,69 @@ export default function FormaNaloga({
           </label>
         </div>
       )}
+
+      <fieldset className="space-y-3 rounded-lg border p-4" style={{ borderColor: "var(--ivica)" }}>
+        <legend className="px-2 text-xs font-semibold uppercase tracking-wide tiho">
+          Slanje (SMTP) — odvojeno od prijema
+        </legend>
+        <p className="tiho text-xs">
+          Koristi se kad klikneš „Odobri i pošalji”. Ako ostaviš prazno, mail se ne šalje, samo se bilježi.
+        </p>
+
+        <div className="grid gap-3 md:grid-cols-[2fr_1fr_1fr]">
+          <label className="space-y-1">
+            <span className="tiho text-xs">SMTP server</span>
+            <input name="smtp_host" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} placeholder="smtp.gmail.com" className={POLJE} />
+          </label>
+          <label className="space-y-1">
+            <span className="tiho text-xs">SMTP port</span>
+            <input name="smtp_port" type="number" value={smtpPort} onChange={(e) => setSmtpPort(Number(e.target.value))} className={POLJE} />
+          </label>
+          <label className="space-y-1">
+            <span className="tiho text-xs">Šifrovanje</span>
+            <select
+              name="smtp_tls"
+              value={smtpTls}
+              onChange={(e) => {
+                const v = e.target.value as "ssl" | "starttls" | "nista";
+                setSmtpTls(v);
+                if (v === "ssl") setSmtpPort(465);
+                if (v === "starttls") setSmtpPort(587);
+              }}
+              className={POLJE}
+            >
+              <option value="starttls">STARTTLS (port 587)</option>
+              <option value="ssl">SSL/TLS (port 465)</option>
+              <option value="nista">Bez šifrovanja</option>
+            </select>
+          </label>
+          <label className="space-y-1 md:col-span-1">
+            <span className="tiho text-xs">SMTP korisničko ime (prazno = isto kao IMAP)</span>
+            <input name="smtp_korisnik" defaultValue={nalog?.smtp_korisnik ?? ""} autoComplete="off" className={POLJE} />
+          </label>
+          <label className="space-y-1 md:col-span-1">
+            <span className="tiho text-xs">
+              SMTP lozinka {nalog?.smtp_lozinka_postavljena ? "(sačuvana, prazno ostavlja staru)" : "(prazno = lozinka naloga)"}
+            </span>
+            <input name="smtp_lozinka" type="password" autoComplete="new-password" className={POLJE} />
+          </label>
+          <label className="space-y-1 md:col-span-1">
+            <span className="tiho text-xs">Adresa pošiljaoca (prazno = korisničko ime)</span>
+            <input name="smtp_od" type="email" defaultValue={nalog?.smtp_od ?? ""} className={POLJE} />
+          </label>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={testirajSlanje} disabled={smtpTestira} className="polje text-xs">
+            {smtpTestira ? "Testiram…" : "Testiraj slanje"}
+          </button>
+          {smtpTest && (
+            <span className={`text-xs ${smtpTest.ok ? "text-emerald-400" : "text-red-400"}`}>
+              {smtpTest.ok ? "● Povezano" : "● Greška"}: {smtpTest.poruka}
+            </span>
+          )}
+        </div>
+      </fieldset>
 
       <input type="hidden" name="aktivan" value={nalog?.aktivan === false ? "" : "on"} />
 

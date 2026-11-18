@@ -121,3 +121,37 @@ export async function odjava() {
   await supabase.auth.signOut();
   redirect("/prijava");
 }
+
+export type PorukaPrepiske = {
+  id: string;
+  smjer: "ulazna" | "izlazna";
+  od: string | null;
+  za: string[];
+  tema: string | null;
+  tijelo: string | null;
+  datum: string;
+};
+
+/** Cijela prepiska kojoj pripada mail iz kartice (original i poslani odgovor), od starije ka novijoj. */
+export async function ucitajPrepisku(porukaId: string): Promise<PorukaPrepiske[]> {
+  const supabase = await server();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/prijava");
+
+  const polja = "id, smjer, od, za, tema, tijelo, datum, thread_id";
+  const { data: ova } = await supabase.from("messages").select(polja).eq("id", porukaId).maybeSingle();
+  if (!ova) return [];
+
+  let sve = [ova];
+  if (ova.thread_id) {
+    const { data } = await supabase
+      .from("messages")
+      .select(polja)
+      .eq("thread_id", ova.thread_id)
+      .order("datum", { ascending: true });
+    if (data?.length) sve = data;
+  }
+  return sve.map(({ thread_id: _t, ...m }) => m) as PorukaPrepiske[];
+}

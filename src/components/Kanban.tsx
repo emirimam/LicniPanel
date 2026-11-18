@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { pomjeriZadatak } from "@/app/akcije";
+import MailModal from "@/components/MailModal";
 import { FAZE, type Faza, type Zadatak } from "@/lib/tipovi";
 import {
   PrioritetZnacka,
@@ -22,6 +23,7 @@ export default function Kanban({
   const [ceka, pokreni] = useTransition();
   const [povuceno, setPovuceno] = useState<string | null>(null);
   const [cilj, setCilj] = useState<Faza | null>(null);
+  const [otvorenMail, setOtvorenMail] = useState<string | null>(null);
 
   const premjesti = (id: string, faza: Faza) =>
     pokreni(() => pomjeriZadatak(id, faza));
@@ -87,9 +89,14 @@ export default function Kanban({
                       <RokZnacka rok={z.rok} />
                       <VrijemeZnacka vrijeme={z.vrijeme} />
                       {z.source_message_id && (
-                        <span className="tiho text-[11px]" title="nastalo iz pošte">
-                          ✉
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setOtvorenMail(z.source_message_id)}
+                          className="tiho rounded px-1.5 py-0.5 text-[11px] hover:bg-white/[0.06] hover:text-[var(--tekst)]"
+                          title="Otvori cijeli mail"
+                        >
+                          ✉ Otvori mail
+                        </button>
                       )}
                     </div>
 
@@ -134,6 +141,7 @@ export default function Kanban({
           </section>
         );
       })}
+      {otvorenMail && <MailModal porukaId={otvorenMail} onZatvori={() => setOtvorenMail(null)} />}
     </div>
   );
 }

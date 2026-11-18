@@ -15,7 +15,7 @@ export default async function Nalozi() {
   const { data: nalozi } = await supabase
     .from("accounts")
     .select(
-      "id, naziv, vrsta, host, port, korisnik, workspace_id, fascikla_poslane, aktivan, smtp_host, smtp_port, webhook_token, tls_nacin, zadnja_sinhronizacija, zadnja_greska, test_status, test_poruka",
+      "id, naziv, vrsta, host, port, korisnik, workspace_id, fascikla_poslane, aktivan, smtp_host, smtp_port, smtp_korisnik, smtp_od, smtp_tls, smtp_secret_ref, webhook_token, tls_nacin, zadnja_sinhronizacija, zadnja_greska, test_status, test_poruka",
     )
     .order("naziv");
 
@@ -106,7 +106,13 @@ export default async function Nalozi() {
             Svaki nalog pripada jednom prostoru. IMAP za prijem, SMTP za slanje odgovora, ili webhook za brzi prijem.
           </p>
         </div>
-        <ListaNaloga nalozi={nalozi ?? []} prostori={prostori} webBaza={webBaza} />
+        <ListaNaloga
+          nalozi={(nalozi ?? []).map(({ smtp_secret_ref, ...n }) => ({
+            ...n,
+            smtp_lozinka_postavljena: Boolean(smtp_secret_ref),
+          }))} prostori={prostori}
+          webBaza={webBaza}
+        />
         <PowerAutomateUputstvo baza={webBaza} webhookNalozi={webhookNalozi} />
 
         <p className="tiho text-xs">

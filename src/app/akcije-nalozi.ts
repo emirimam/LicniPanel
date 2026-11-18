@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ImapFlow } from "imapflow";
 import { server } from "@/lib/supabase/server";
+import { smtpTransport, ucitajSmtp, type SmtpTls } from "@/lib/smtp";
 
 export type IshodNaloga = { greska?: string; poruka?: string };
 export type IshodTesta = { ok: boolean; poruka: string };
@@ -37,6 +38,11 @@ function citaj(formData: FormData) {
     fascikla_poslane: String(formData.get("fascikla_poslane") ?? "").trim() || null,
     smtp_host: String(formData.get("smtp_host") ?? "").trim() || null,
     smtp_port: Number.isFinite(smtpPort) ? smtpPort : 587,
+    smtp_korisnik: String(formData.get("smtp_korisnik") ?? "").trim() || null,
+    smtp_od: String(formData.get("smtp_od") ?? "").trim() || null,
+    smtp_tls: (TLS.includes(String(formData.get("smtp_tls")) as Tls)
+      ? String(formData.get("smtp_tls"))
+      : "starttls") as SmtpTls,
     tls_nacin: (TLS.includes(String(formData.get("tls_nacin")) as Tls)
       ? String(formData.get("tls_nacin"))
       : "ssl") as Tls,
@@ -102,6 +108,15 @@ export async function sacuvajNalog(
     if (error) return { greska: `Nalog je spašen, ali lozinka nije: ${error.message}` };
   }
 
+  const smtpLozinka = String(formData.get("smtp_lozinka") ?? "");
+  if (smtpLozinka) {
+    const { error } = await supabase.rpc("sacuvaj_smtp_lozinku", {
+      p_account_id: accountId,
+      p_lozinka: smtpLozinka,
+    });
+    if (error) return { greska: `Nalog je spašen, ali SMTP lozinka nije: ${error.message}` };
+  }
+
   revalidatePath("/nalozi");
   return { poruka: id ? "Izmjene su spašene." : "Nalog je dodan." };
 }
@@ -150,6 +165,39 @@ export async function testirajNalog(formData: FormData): Promise<IshodTesta> {
     const poruka = `Greška: ${e instanceof Error ? e.message : "nepoznata greška"}`;
     await upisiTest(supabase, id, "greska", poruka);
     return { ok: false, poruka };
+  }
+}
+
+/**
+ * Testira SMTP prijavu (bez slanja maila). Prazna lozinka znaci sacuvana SMTP lozinka,
+ * a ako ni nje nema, IMAP lozinka naloga.
+ */
+export async function testirajSmtp(formData: FormData): Promise<IshodTesta> {
+  const { supabase } = await prijavljen();
+  const id = String(formData.get("id") ?? "").trim();
+  const polja = citaj(formData);
+
+  if (!polja.smtp_host) return { ok: false, poruka: "Upiši SMTP server." };
+
+  const sacuvano = id ? await ucitajSmtp(supabase, id) : null;
+  const lozinka = String(formData.get("smtp_lozinka") ?? "") || sacuvano?.lozinka || "";
+  const korisnik = polja.smtp_korisnik || polja.korisnik;
+  if (!korisnik || !lozinka) {
+    return { ok: false, poruka: "Upiši SMTP korisničko ime i lozinku." };
+  }
+
+  try {
+    await smtpTransport({
+      host: polja.smtp_host,
+      port: polja.smtp_port,
+      tls: polja.smtp_tls,
+      korisnik,
+      lozinka,
+      od: polja.smtp_od || korisnik,
+    }).verify();
+    return { ok: true, poruka: "SMTP prijava uspjela. Slanje je spremno." };
+  } catch (e) {
+    return { ok: false, poruka: `Greška: ${e instanceof Error ? e.message : "nepoznata greška"}` };
   }
 }
 

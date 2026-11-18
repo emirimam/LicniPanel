@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import nodemailer from "nodemailer";
+import { randomUUID } from "node:crypto";
 import { server } from "@/lib/supabase/server";
 import { ucitajProstore } from "@/lib/prostor";
 import { obradiMail, napisiNacrtZa, testirajKljuc, type Mail } from "@/lib/ai";
+import { smtpTransport, ucitajSmtp } from "@/lib/smtp";
 import { kreirajPrijedlog, type SadrzajPrijedloga } from "@/lib/prijedlog";
 
 export type IshodAI = { greska?: string; poruka?: string };
@@ -191,94 +192,144 @@ function emailIz(tekst: string): string | null {
 
 /**
  * Odobri i posalji. Ako nalog ima SMTP, mail se stvarno salje.
- * Ako nema (demo nalog), samo se bilježi slanje. Kartica ide u Čekam odgovor sa rokom od 48h.
+ * Ako nema (demo nalog), samo se bilježi slanje. Poslani mail i original se spremaju
+ * u prepisku, a na tabli se pravi kartica (Čekam drugog) iz koje se mail otvara u cijelosti.
  */
 export async function odobriPrijedlog(id: string, nacrt: string): Promise<IshodAI> {
   const { supabase, user } = await prijavljen();
 
+  const tekst = nacrt.trim();
+  if (!tekst) return { greska: "Odgovor je prazan." };
+
   const { data: p } = await supabase
     .from("suggestions")
-    .select("id, sadrzaj, workspace_id")
+    .select("id, sadrzaj, workspace_id, status")
     .eq("id", id)
     .single();
   if (!p) return { greska: "Prijedlog ne postoji." };
+  // Zastita od duplog klika: vec rijesen prijedlog se ne salje ponovo.
+  if (p.status !== "ceka") return { greska: "Ovaj prijedlog je već riješen." };
 
   const s = p.sadrzaj as SadrzajPrijedloga;
   const primalac = emailIz(s.original.od);
+  const tema = /^re:/i.test(s.original.tema) ? s.original.tema : `Re: ${s.original.tema || "(bez teme)"}`;
+  const sada = new Date();
+
   let stvarnoPoslano = false;
+  let posiljalac: string | null = null;
+  let idPoruke = `<demo-${randomUUID()}@licni-panel.local>`;
 
   if (s.nalog_id) {
-    const { data: nalog } = await supabase
-      .from("accounts")
-      .select("id, korisnik, smtp_host, smtp_port")
-      .eq("id", s.nalog_id)
-      .maybeSingle();
-
-    if (nalog?.smtp_host) {
+    const smtp = await ucitajSmtp(supabase, s.nalog_id);
+    if (smtp) {
       if (!primalac) return { greska: "Ne vidim email adresu pošiljaoca." };
-      const { data: lozinka } = await supabase.rpc("lozinka_naloga_vlasnika", {
-        p_account_id: nalog.id,
-      });
-      const port = nalog.smtp_port ?? 587;
+      if (smtp.korisnik && !smtp.lozinka) {
+        return { greska: "SMTP lozinka nije postavljena. Dodaj je u Nalozi." };
+      }
       try {
-        const transport = nodemailer.createTransport({
-          host: nalog.smtp_host,
-          port,
-          secure: port === 465,
-          auth: { user: nalog.korisnik ?? undefined, pass: lozinka ?? undefined },
-        });
-        await transport.sendMail({
-          from: nalog.korisnik ?? undefined,
+        const info = await smtpTransport(smtp).sendMail({
+          from: smtp.od,
           to: primalac,
-          subject: s.original.tema.startsWith("Re:") ? s.original.tema : `Re: ${s.original.tema}`,
-          text: nacrt,
+          subject: tema,
+          text: tekst,
         });
         stvarnoPoslano = true;
+        posiljalac = smtp.od;
+        if (info.messageId) idPoruke = info.messageId;
       } catch (e) {
         return { greska: `Slanje nije uspjelo: ${e instanceof Error ? e.message : "greška"}` };
       }
     }
   }
 
-  const sada = new Date();
-  const rokOdgovora = new Date(sada.getTime() + 48 * 3600 * 1000).toISOString();
+  // Od ovog trenutka mail je (ako je stvarno) otisao. Greske u bazi se samo prijavljuju.
+  const upozorenja: string[] = [];
 
-  await supabase.from("threads").insert({
-    user_id: user.id,
-    workspace_id: p.workspace_id,
-    thread_key: `ai:${id}`,
-    tema: s.original.tema,
-    ucesnici: primalac ? [primalac] : [s.original.od],
-    zadnja_poruka: sada.toISOString(),
-    ceka_odgovor: true,
-    rok_odgovora: rokOdgovora,
-  });
-
-  if (s.zadatak) {
-    await supabase.from("tasks").insert({
+  const { data: prepiska, error: greskaPrepiske } = await supabase
+    .from("threads")
+    .insert({
       user_id: user.id,
       workspace_id: p.workspace_id,
-      naslov: s.zadatak,
-      opis: s.sazetak,
-      rok: s.rok,
-      prioritet: s.prioritet,
-      faza: "cekam_drugog",
-    });
-  }
+      thread_key: `ai:${id}`,
+      tema: s.original.tema,
+      ucesnici: primalac ? [primalac] : [s.original.od],
+      zadnja_poruka: sada.toISOString(),
+      ceka_odgovor: true,
+      rok_odgovora: new Date(sada.getTime() + 48 * 3600 * 1000).toISOString(),
+    })
+    .select("id")
+    .single();
+  if (greskaPrepiske) upozorenja.push(greskaPrepiske.message);
+
+  const prepiskaId = prepiska?.id ?? null;
+
+  // Original (dolazni) mail, da se prepiska vidi cijela.
+  await supabase.from("messages").insert({
+    user_id: user.id,
+    workspace_id: p.workspace_id,
+    account_id: s.nalog_id,
+    thread_id: prepiskaId,
+    message_id: `ai-orig:${id}`,
+    smjer: "ulazna",
+    od: s.original.od,
+    za: posiljalac ? [posiljalac] : [],
+    tema: s.original.tema,
+    tijelo: s.original.tijelo,
+    izvod: s.original.tijelo.slice(0, 400),
+    datum: new Date(sada.getTime() - 1000).toISOString(),
+    obradjena: true,
+  });
+
+  // Poslani odgovor.
+  const { data: poslana, error: greskaPoruke } = await supabase
+    .from("messages")
+    .insert({
+      user_id: user.id,
+      workspace_id: p.workspace_id,
+      account_id: s.nalog_id,
+      thread_id: prepiskaId,
+      message_id: idPoruke,
+      smjer: "izlazna",
+      od: posiljalac,
+      za: primalac ? [primalac] : [],
+      tema,
+      tijelo: tekst,
+      izvod: tekst.slice(0, 400),
+      datum: sada.toISOString(),
+      obradjena: true,
+    })
+    .select("id")
+    .single();
+  if (greskaPoruke) upozorenja.push(greskaPoruke.message);
+
+  // Kartica na tabli uvijek postoji, da se poslani mail moze otvoriti i procitati.
+  const { error: greskaZadatka } = await supabase.from("tasks").insert({
+    user_id: user.id,
+    workspace_id: p.workspace_id,
+    naslov: s.zadatak ?? `Čekam odgovor: ${s.original.tema || "(bez teme)"}`,
+    opis: s.sazetak,
+    rok: s.rok,
+    prioritet: s.prioritet,
+    faza: "cekam_drugog",
+    source_message_id: poslana?.id ?? null,
+  });
+  if (greskaZadatka) upozorenja.push(greskaZadatka.message);
 
   await supabase
     .from("suggestions")
     .update({
       status: "prihvacen",
       rijeseno_u: sada.toISOString(),
-      sadrzaj: { ...s, nacrt, poslano_stvarno: stvarnoPoslano, poslano_u: sada.toISOString() },
+      sadrzaj: { ...s, nacrt: tekst, poslano_stvarno: stvarnoPoslano, poslano_u: sada.toISOString() },
     })
     .eq("id", id);
 
   revalidatePath("/", "layout");
+
+  const osnova = stvarnoPoslano
+    ? `Poslano na ${primalac}. Čekam odgovor 48h.`
+    : "Označeno kao poslano (nalog nema SMTP, mail nije otišao). Čekam odgovor 48h.";
   return {
-    poruka: stvarnoPoslano
-      ? "Poslano. Čekam odgovor 48h."
-      : "Označeno kao poslano (demo nalog, mail nije otišao). Čekam odgovor 48h.",
+    poruka: upozorenja.length ? `${osnova} Upozorenje: ${upozorenja.join("; ")}` : osnova,
   };
 }
