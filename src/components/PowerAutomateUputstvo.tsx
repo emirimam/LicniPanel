@@ -50,8 +50,8 @@ export default function PowerAutomateUputstvo({
         </li>
         <li className={korak}>
           <p className="font-medium">3. Dodaj Compose</p>
-          <p className="tiho text-xs">U polje Inputs (Expression) zalijepi:</p>
-          <KopirajLink tekst={"addProperty(addProperty(addProperty(json('{}'), 'od', triggerOutputs()?['body/from']), 'tema', triggerOutputs()?['body/subject']), 'tijelo', triggerOutputs()?['body/body'])"} />
+          <p className="tiho text-xs">U polje Inputs (Expression) zalijepi (šalje cijelo tijelo i vrijeme prijema; HTML panel sam pretvara u tekst):</p>
+          <KopirajLink tekst={"addProperty(addProperty(addProperty(addProperty(json('{}'), 'od', triggerOutputs()?['body/from']), 'tema', triggerOutputs()?['body/subject']), 'tijelo', triggerOutputs()?['body/body']), 'datum', triggerOutputs()?['body/receivedDateTime'])"} />
         </li>
         <li className={korak}>
           <p className="font-medium">4. Dodaj HTTP</p>

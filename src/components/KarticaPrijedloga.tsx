@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { odobriPrijedlog, urediNacrt } from "@/app/akcije-ai";
 import { rijesiPrijedlog } from "@/app/akcije";
+import { datumVrijeme } from "@/lib/datum";
 import type { SadrzajPrijedloga } from "@/lib/prijedlog";
 import { PrioritetZnacka, RokZnacka, ProstorZnacka } from "@/components/Znacke";
 
@@ -47,14 +48,17 @@ export default function KarticaPrijedloga({
         <PrioritetZnacka prioritet={sadrzaj.prioritet} />
         {sadrzaj.rok && <RokZnacka rok={sadrzaj.rok} />}
         {prostor && <ProstorZnacka naziv={prostor.naziv} boja={prostor.boja} />}
-        <span className="ml-auto text-xs tiho">{sadrzaj.original.od}</span>
+        <span className="ml-auto text-xs tiho">
+          {sadrzaj.original.od}
+          {datumVrijeme(sadrzaj.original.datum) && ` · ${datumVrijeme(sadrzaj.original.datum)}`}
+        </span>
       </div>
 
       <div className="grid md:grid-cols-2">
         <section className="space-y-2 border-b p-5 md:border-b-0 md:border-r" style={{ borderColor: "var(--ivica)" }}>
           <p className="text-xs font-semibold uppercase tracking-wide tiho">Original</p>
           <p className="text-sm font-medium">{o.tema || "(bez teme)"}</p>
-          <p className="max-h-56 overflow-y-auto whitespace-pre-line text-sm tiho">{o.tijelo}</p>
+          <p className="max-h-[32rem] overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed">{o.tijelo}</p>
         </section>
 
         <section className="space-y-3 p-5">

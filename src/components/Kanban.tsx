@@ -92,10 +92,15 @@ export default function Kanban({
                         <button
                           type="button"
                           onClick={() => setOtvorenMail(z.source_message_id)}
-                          className="tiho rounded px-1.5 py-0.5 text-[11px] hover:bg-white/[0.06] hover:text-[var(--tekst)]"
+                          className="tiho inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] ring-1 ring-inset ring-white/10 hover:bg-white/[0.06] hover:text-[var(--tekst)]"
                           title="Otvori cijeli mail"
+                          aria-label="Otvori cijeli mail"
                         >
-                          ✉ Otvori mail
+                          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <rect x="3" y="5" width="18" height="14" rx="2" />
+                            <path d="m3 7 9 6 9-6" />
+                          </svg>
+                          Mail
                         </button>
                       )}
                     </div>

@@ -35,3 +35,19 @@ export function imeDana(iso: string): string {
   const [g, m, d] = iso.split("-").map(Number);
   return KRATKI_DANI[new Date(Date.UTC(g, m - 1, d)).getUTCDay()];
 }
+
+const formaterVremena = new Intl.DateTimeFormat("bs-BA", {
+  timeZone: ZONA,
+  day: "numeric",
+  month: "numeric",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+/** Datum i sat u lokalnoj zoni vlasnika, npr. "18. 11. 2026. 14:32". Prazan ili neispravan unos daje "". */
+export function datumVrijeme(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : formaterVremena.format(d);
+}

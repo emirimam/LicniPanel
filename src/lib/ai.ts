@@ -1,7 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { datumVrijeme } from "@/lib/datum";
 
 /** Mail koji obradjujemo, bez obzira dolazi li iz workera, webhooka ili simulacije. */
-export type Mail = { od: string; tema: string; tijelo: string };
+/** datum = kada je mail stigao (ISO). */
+export type Mail = { od: string; tema: string; tijelo: string; datum?: string };
 
 export type ProstorZaAI = {
   id: string;
@@ -31,7 +33,7 @@ export type Ishod =
       prostor: ProstorZaAI | null;
     };
 
-const MAX_TIJELO = 8000;
+const MAX_TIJELO = 30000;
 
 const ALAT_ANALIZA = {
   name: "analiziraj_mail",
@@ -87,7 +89,8 @@ function klijent(kljuc: string) {
 }
 
 function tekstPoruke(mail: Mail): string {
-  return `Od: ${mail.od}\nTema: ${mail.tema}\n\n${mail.tijelo.slice(0, MAX_TIJELO)}`;
+  const primljeno = datumVrijeme(mail.datum);
+  return `Od: ${mail.od}\n${primljeno ? `Primljeno: ${primljeno}\n` : ""}Tema: ${mail.tema}\n\n${mail.tijelo.slice(0, MAX_TIJELO)}`;
 }
 
 async function analiziraj(

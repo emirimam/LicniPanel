@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { obradiMail, type ProstorZaAI } from "@/lib/ai";
 import { kreirajPrijedlog } from "@/lib/prijedlog";
+import { htmlUTekst } from "@/lib/tekst";
 
 export const runtime = "nodejs";
 
@@ -34,16 +35,26 @@ export async function POST(
     return Response.json({ greska: "Nepoznata ili pauzirana adresa." }, { status: 404 });
   }
 
-  let tijelo: { od?: string; tema?: string; tijelo?: string };
+  let tijelo: Record<string, unknown>;
   try {
     tijelo = await zahtjev.json();
   } catch {
     return Response.json({ greska: "Očekujem JSON." }, { status: 400 });
   }
+  // Power Automate salje HTML tijelo i receivedDateTime; prihvatamo i engleske nazive.
+  const prvo = (...kljucevi: string[]) => {
+    for (const k of kljucevi) {
+      const v = tijelo[k];
+      if (typeof v === "string" && v.trim()) return v;
+    }
+    return "";
+  };
+  const primljeno = new Date(prvo("datum", "primljeno", "receivedDateTime", "date"));
   const mail = {
-    od: String(tijelo.od ?? "").slice(0, 300),
-    tema: String(tijelo.tema ?? "").slice(0, 300),
-    tijelo: String(tijelo.tijelo ?? ""),
+    od: prvo("od", "from").slice(0, 300),
+    tema: prvo("tema", "subject").slice(0, 300),
+    tijelo: htmlUTekst(prvo("tijelo", "body", "tekst", "text")).slice(0, 200000),
+    datum: (Number.isNaN(primljeno.getTime()) ? new Date() : primljeno).toISOString(),
   };
   if (!mail.tijelo) {
     return Response.json({ greska: "Prazno tijelo." }, { status: 400 });

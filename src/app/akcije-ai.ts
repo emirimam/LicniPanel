@@ -82,6 +82,7 @@ export async function simulirajMail(_prethodno: IshodAI, formData: FormData): Pr
     od: String(formData.get("od") ?? "").trim(),
     tema: String(formData.get("tema") ?? "").trim(),
     tijelo: String(formData.get("tijelo") ?? "").trim(),
+    datum: new Date().toISOString(),
   };
   if (!mail.tijelo) return { greska: "Zalijepi tekst maila." };
 
@@ -276,7 +277,7 @@ export async function odobriPrijedlog(id: string, nacrt: string): Promise<IshodA
     tema: s.original.tema,
     tijelo: s.original.tijelo,
     izvod: s.original.tijelo.slice(0, 400),
-    datum: new Date(sada.getTime() - 1000).toISOString(),
+    datum: s.original.datum ?? new Date(sada.getTime() - 1000).toISOString(),
     obradjena: true,
   });
 

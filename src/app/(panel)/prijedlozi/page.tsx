@@ -5,6 +5,7 @@ import { vratiFiltrirano } from "@/app/akcije-ai";
 import SimulacijaMaila from "@/components/SimulacijaMaila";
 import KarticaPrijedloga from "@/components/KarticaPrijedloga";
 import { PrioritetZnacka, ProstorZnacka } from "@/components/Znacke";
+import { datumVrijeme } from "@/lib/datum";
 import type { SadrzajPrijedloga } from "@/lib/prijedlog";
 
 type Red = {
@@ -100,7 +101,10 @@ export default async function Prijedlozi() {
               <div key={f.id} className="flex flex-wrap items-start gap-4 p-4">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium">{String(f.sadrzaj.naslov ?? "Bez teme")}</p>
-                  <p className="tiho mt-0.5 text-xs">{(f.sadrzaj.original as { od?: string })?.od}</p>
+                  <p className="tiho mt-0.5 text-xs">
+                    {(f.sadrzaj.original as { od?: string })?.od}
+                    {datumVrijeme((f.sadrzaj.original as { datum?: string })?.datum) && ` · ${datumVrijeme((f.sadrzaj.original as { datum?: string })?.datum)}`}
+                  </p>
                   {f.obrazlozenje && <p className="tiho mt-1 text-xs">Razlog: {f.obrazlozenje}</p>}
                 </div>
                 <div className="flex gap-2">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { datumVrijeme } from "@/lib/datum";
 import { ucitajPrepisku, type PorukaPrepiske } from "@/app/akcije";
 
 /** Prozor s cijelom prepiskom kartice: original i poslani odgovor. */
@@ -49,7 +50,7 @@ export default function MailModal({ porukaId, onZatvori }: { porukaId: string; o
                 </span>
                 <span>Od: {m.od ?? "—"}</span>
                 {m.za.length > 0 && <span>Za: {m.za.join(", ")}</span>}
-                <span className="ml-auto">{new Date(m.datum).toLocaleString("bs-BA")}</span>
+                <span className="ml-auto">{datumVrijeme(m.datum)}</span>
               </div>
               <p className="mb-2 text-sm font-medium">{m.tema ?? "(bez teme)"}</p>
               <p className="whitespace-pre-wrap text-sm leading-relaxed">{m.tijelo ?? ""}</p>
